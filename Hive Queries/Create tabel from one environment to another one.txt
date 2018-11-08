@@ -1,0 +1,60 @@
+------------------------------------------------------------------------------------------------------------------------
+file=$1
+month=$2
+HIVE_BUILD_DB=ncl_campaign
+metics_hive_url=jdbc:hive2://aeamxp00e0:10000/${HIVE_BUILD_DB};
+
+USER=pmcprod
+metics_hive_sql="ncl_campaign_hive_load.hql"
+
+echo "/opt/mapr/hive/hive/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql} --hiveconf HIVE_DB_TABLE=ncl_campaign.campaign_one_view --hiveconf file=${file} --hiveconf part_month=${month}"
+#${HIVE_HOME}/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql}
+/opt/mapr/hive/hive/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql} --hiveconf HIVE_DB_TABLE=ncl_campaign.campaign_one_view --hiveconf file=${file} --hiveconf part_month=${month}
+
+helios_ret_cde=$?
+
+if [ $helios_ret_cde -ne 0 ];then
+     echo `date +'\%Y\%m\%d'`."Metics mdb hive script failed with RC: $helios_ret_cde"
+     exit $helios_ret_cde
+else
+     echo `date +'\%Y\%m\%d'`."Metics mdb hive script completed with RC: $helios_ret_cde"
+     exit $helios_ret_cde
+fi
+
+echo "*************************************************************************************"
+mdb_hive=$1
+HIVE_BUILD_DB=$2
+metics_hive_url=jdbc:hive2://aeamxp00e0:10000/${HIVE_BUILD_DB}
+metics_hive_sql
+hive -e "set hive.cli.print.header=true;use ${HIVE_BUILD_DB};show create table $mdb_hive" >> ${metics_hive_sql}
+sed -i 1,2d ${metics_hive_sql}
+#sed -i 1d ${metics_hive_sql}
+sed -i "1s|^|CREATE EXTERNAL TABLE IF NOT EXISTS ${HIVE_BUILD_DB}.${mdb_hive}( \n|" ${metics_hive_sql}
+
+echo "/opt/mapr/hive/hive/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql}"
+#${HIVE_HOME}/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql}
+/opt/mapr/hive/hive/bin/beeline -u ${metics_hive_url} -n ${USER} -f ${metics_hive_sql}
+helios_ret_cde=$?
+
+if [ $helios_ret_cde -ne 0 ];then
+       echo `date +'\%Y\%m\%d'`."Metics mdb hive script failed with RC: $helios_ret_cde"
+       exit $helios_ret_cde
+else
+       echo `date +'\%Y\%m\%d'`."Metics mdb hive script completed with RC: $helios_ret_cde"
+       exit $helios_ret_cde
+fi
+echo "*************************************************************************************"
+
+
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/logs/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh site_active_xref ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+	sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh site_inactive_xref ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh site_xref ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script
+sh /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/bin/create_table_in_metics.sh arbitrated_baselinepass_ind ajax_201810 ajax_201810 /mapr/Helios/amexuserdata/AETPMC/pmcprod/ajax_dev/temp/201810/metics_table_script

@@ -1,0 +1,128 @@
+set hivevar:DATE='2018-09-16';
+set hivevar:input_table=arbitrated_baselinepass_only_ind;
+create table Resting_Initial_Predicate as
+with initial_predicate as (select a.* 
+  from ${hivevar:input_table} a 
+where not ( 
+      ( unix_timestamp(SIT_SPR_SCH_LAST_CALL_DATE,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-23),'yyyy-MM-dd') 
+    and (SIT_SPR_SCH_DISPOSITION in ('DEAD','DQND','DQCP','DECE'))
+        )
+    or (unix_timestamp(SIT_SPR_SCH_LAST_CALL_DATE,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-11),'yyyy-MM-dd') 
+         and SIT_SPR_SCH_DISPOSITION in ('DQCC','DQOP','NOIB','NASB','NALC','NACL')
+         )
+    or (unix_timestamp(SIT_SPR_SCH_LAST_CALL_DATE,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-5),'yyyy-MM-dd') 
+        and SIT_SPR_SCH_DISPOSITION in ('SWON','SMIS','NODC','SALA','SALE','SALEQ','SALP','SALX','SALD','INRF','ERHU')
+         )
+    or (unix_timestamp(SIT_SPR_SCH_LAST_CALL_DATE ,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-2),'yyyy-MM-dd')
+         and SIT_SPR_SCH_DISPOSITION in ('MAXA','MAXG','DMHU','DMNI')
+         )
+    ))
+select * from initial_predicate;
+
+drop table resting_last_called_recently;
+create table resting_last_called_recently as
+with last_called_recently as 
+(select sit_mzp_id as lst_zit_mzp_id 
+   from ${hivevar:input_table} 
+  where (unix_timestamp(SIT_SPR_SCH_LAST_CALL_DATE,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-1),'yyyy-MM-dd') 
+    and sit_spr_sch_disposition <> 'CMXP')
+)
+select a.* from Resting_Initial_Predicate a left join last_called_recently b on (a.sit_mzp_id = b.lst_zit_mzp_id) where b.lst_zit_mzp_id is null ;
+
+drop table resting_Auto_Dealers;
+create table resting_Auto_Dealers as 
+select * from resting_last_called_recently where sit_sdb_tft_branch = 'N' 
+          or length(trim(sit_sdb_tft_branch))= 0;
+
+drop table if exists resting_sf_active;
+create table resting_sf_active as 
+with sf_active as (
+select distinct smp_current_sit_mzp_id 
+  from sit_mzp_promotions_out join 
+       site_out on (smp_current_sit_mzp_id = sit_mzp_id) 
+  where (smp_plan_name like upper(concat('%',year(add_months(${hivevar:DATE},-2)),'_',date_format(add_months(${hivevar:DATE},-2),'MMM'),'_CAG%')) 
+     or smp_plan_name like upper(concat('%',year(add_months(${hivevar:DATE},-1)),'_',date_format(add_months(${hivevar:DATE},-1),'MMM'),'_CAG%'))
+     or smp_plan_name like upper(concat('%',year(${hivevar:DATE}),'_',date_format(${hivevar:DATE},'MMM'),'_CAG%')) 
+         )
+)
+select a.* from resting_Auto_Dealers a left join sf_active b on (a.sit_mzp_id = b.smp_current_sit_mzp_id) where smp_current_sit_mzp_id is null;
+
+drop table if exists resting_gpd_annual_campaign;
+create table resting_gpd_annual_campaign as
+with gpd_annual_campaign as ( 
+select distinct smp_current_sit_mzp_id 
+  from sit_mzp_promotions_out sit_mzp_prom join 
+       site_out site_ot on (sit_mzp_prom.smp_current_sit_mzp_id = site_ot.sit_mzp_id)
+ where (smp_promo_name like '2017_SFDC_DATA_PULL_FINAL' or smp_tmid='Leads4U' or gcp_field_campaign_title='Leads4U')
+)
+select a.* from resting_sf_active a left join gpd_annual_campaign b on (a.sit_mzp_id = b.smp_current_sit_mzp_id) where smp_current_sit_mzp_id is null;
+
+
+drop table if exists resting_channel_propensity;
+create table resting_channel_propensity as
+with channel_propensity as (
+select distinct cp_elgbl_pop_flag.sit_mzp_id as cp_mzp_id 
+  from ajax_static_files.cp_elgbl_pop_flag join 
+       site_out on(cp_elgbl_pop_flag.sit_mzp_id = site_out.sit_mzp_id)
+)
+select a.* from resting_gpd_annual_campaign a left join channel_propensity b on (a.sit_mzp_id = b.cp_mzp_id) where cp_mzp_id is null;
+
+
+drop table if exists resting_LL_RR_OPEN;
+create table resting_LL_RR_OPEN as
+with LL_RR_OPEN as (
+select distinct slv_sit_mzp_id 
+  from open_site_lead_validation_out join 
+       site_out on(sit_mzp_id = slv_sit_mzp_id) 
+ where ( unix_timestamp(slv_call_date,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-11),'yyyy-MM-dd') 
+         and slv_obcs_disposition_code in ('39','42','43','44','66')
+        )
+    or (unix_timestamp(slv_call_date,'yyyyMMdd') >= unix_timestamp(add_months(trunc(${hivevar:DATE},'MM'),-2),'yyyy-MM-dd') 
+        and slv_obcs_disposition_code in ('31','52','76','57')
+       )
+)select a.* from resting_channel_propensity a left join LL_RR_OPEN b on (a.sit_mzp_id = b.slv_sit_mzp_id) where slv_sit_mzp_id is null;
+
+drop table if exists resting_VERTICAL_STRATEGY_CAMPAIGN;
+create table resting_VERTICAL_STRATEGY_CAMPAIGN as
+with VERTICAL_STRATEGY_CAMPAIGN as (
+select distinct smp_current_sit_mzp_id 
+  from sit_mzp_promotions_out join 
+       site_out on (sit_mzp_id = smp_current_sit_mzp_id) 
+ where smp_promo_name like concat('LGUS_',date_format(add_months(${hivevar:DATE},-3),'YYYYMM'),'_SFDC_PROACTIVE_IND')
+)
+select a.* from resting_LL_RR_OPEN a left join VERTICAL_STRATEGY_CAMPAIGN b on (a.sit_mzp_id = b.smp_current_sit_mzp_id) where smp_current_sit_mzp_id is null;
+
+drop table if exists resting_REG_ACTIVE;
+create table resting_REG_ACTIVE as
+with REG_ACTIVE as (
+select distinct smp_current_sit_mzp_id 
+  from sit_mzp_promotions_out join 
+       site_out on (smp_current_sit_mzp_id = sit_mzp_id)
+ where (smp_promo_name like ('%2018_10_REG%') 
+       or smp_promo_name like ('%2018_09_REG%')
+       or smp_promo_name like ('%2018_08_REG%')
+       or smp_promo_name like ('%LGUS_0718_REG%')
+       or smp_promo_name like ('%2018_05_REG%'))
+)
+select a.* from resting_VERTICAL_STRATEGY_CAMPAIGN a left join REG_ACTIVE b on (a.sit_mzp_id = b.smp_current_sit_mzp_id) where smp_current_sit_mzp_id is null;
+
+
+drop table if exists resting_waterfal;
+create table resting_waterfal as 
+select 'Initial_Predicate',count(*) as cnt from Resting_Initial_Predicate
+union
+select 'Last_Called_recently',count(*) as cnt from resting_last_called_recently
+union
+select 'Auto_Dealers',count(*) as cnt from  resting_auto_dealers
+union
+select 'SF_Active',count(*) as cnt from resting_sf_active
+union
+select 'Gpd_Anual_Campaign',count(*) as cnt from resting_gpd_annual_campaign
+union
+select 'Channel_Propensity',count(*) as cnt from  resting_channel_propensity
+union
+select 'LV_RR_OPEN',count(*) as cnt from resting_ll_rr_open
+union
+select 'Vertical_Strategy',count(*) as cnt from resting_VERTICAL_STRATEGY_CAMPAIGN
+union
+select 'Reg_Active',count(*) as cnt from resting_REG_ACTIVE order by cnt desc;
